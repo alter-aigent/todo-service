@@ -1,12 +1,12 @@
 """Model exports.
 
-The project defines SQLAlchemy models in :mod:`app.models` (module file) but
-other parts of the code import them from the package namespace
-(:mod:`app.models`).
+The SQLAlchemy models live in the module :mod:`app.models` (file ``app/models.py``).
+Some parts of the code import from the package namespace (``from app.models import User``).
 
-This file re-exports the model classes to keep imports stable.
+To avoid circular imports (package importing itself), we import from the sibling
+module using a relative import.
 """
 
-from app.models import Task, User  # noqa: F401
+from ..models import Task, User  # type: ignore[F401]
 
 __all__ = ["User", "Task"]
