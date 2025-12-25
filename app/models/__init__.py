@@ -1,12 +1,20 @@
 """Model exports.
 
-The SQLAlchemy models live in the module :mod:`app.models` (file ``app/models.py``).
-Some parts of the code import from the package namespace (``from app.models import User``).
+This repository has both:
+- ``app/models.py`` (module containing SQLAlchemy models)
+- ``app/models/`` (package used as an import namespace)
 
-To avoid circular imports (package importing itself), we import from the sibling
-module using a relative import.
+Code expects ``from app.models import User, Task`` to work.
+
+Importing from ``app.models`` inside this package causes circular imports.
+So we import the sibling module explicitly via :mod:`importlib`.
 """
 
-from ..models import Task, User  # type: ignore[F401]
+from importlib import import_module
+
+_models_mod = import_module("app.models")
+
+User = getattr(_models_mod, "User")
+Task = getattr(_models_mod, "Task")
 
 __all__ = ["User", "Task"]
