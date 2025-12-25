@@ -1,0 +1,57 @@
+name: Deploy (server)
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    types: [ "closed" ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
+    steps:
+      - name: Deploy via SSH (build on server)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.DEPLOY_HOST }}
+          username: ${{ vars.DEPLOY_USER }}
+          port: ${{ vars.DEPLOY_PORT }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            REPO="${{ github.repository }}"
+            BRANCH="main"
+            DIR="${DEPLOY_DIR:-/home/${{ vars.DEPLOY_USER }}/${{ github.event.repository.name }}}"
+            # Hardcoded external port for this template. Change here if you need a different one.
+            SERVICE_PORT="8000"
+
+            echo "Deploying $REPO@$BRANCH to $DIR (SERVICE_PORT=$SERVICE_PORT)"
+
+            mkdir -p "$DIR"
+
+            if [ ! -d "$DIR/.git" ]; then
+              git clone "https://github.com/$REPO.git" "$DIR"
+            fi
+
+            cd "$DIR"
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
+
+            # Build and run service (DB already exists on server)
+            export SERVICE_PORT="$SERVICE_PORT"
+            # Ensure external port is free (training env, be aggressive)
+            sudo docker ps --filter "publish=${SERVICE_PORT}" -q | xargs -r sudo docker rm -f
+
+            # Clean old compose resources for this project, then start
+            sudo -E docker compose -f docker-compose.server.yml down --remove-orphans || true
+            sudo -E docker compose -f docker-compose.server.yml up -d --build
+
+            sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+

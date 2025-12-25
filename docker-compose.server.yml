@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+    environment:
+      APP_NAME: microservice-template
+      API_PREFIX: ""
+      # DB is already running on the server (published on host 5432)
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/postgres
+    extra_hosts:
+      # allow connecting to host services from inside container on Linux
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${SERVICE_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+
