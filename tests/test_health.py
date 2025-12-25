@@ -1,16 +1,11 @@
-from fastapi.testclient import TestClient
-
-from app.main import create_app
+import pytest
 
 
-def test_health_endpoint_exists() -> None:
-    """
-    Health endpoint also checks DB in runtime, but in unit tests we just verify route exists.
-    """
-    app = create_app()
-    client = TestClient(app)
-    resp = client.get("/health")
-    # If DB isn't configured for tests, FastAPI returns 500, but route must exist.
-    assert resp.status_code in (200, 500)
-
-
+@pytest.mark.asyncio
+async def test_health(client):
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    # Be flexible: allow either {"status": "ok"} or similar
+    assert isinstance(data, dict)
+    assert data.get("status") in {"ok", "healthy", "up"}
