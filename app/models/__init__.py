@@ -1,9 +1,12 @@
-"""Package marker.
+"""Model exports.
 
-Models are defined in ``app/models.py``.
+The actual SQLAlchemy models are defined in the sibling module
+``app/models.py``.
 
-This package exists only because the project structure includes an ``app/models/``
-directory. Import models directly from :mod:`app.models` (the module).
+This package re-exports them so imports like ``from app.models import User``
+work.
 """
 
-__all__: list[str] = []
+from ..models import Task, User
+
+__all__ = ["User", "Task"]
