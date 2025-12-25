@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import asc, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db_session
+from app.api.deps import get_db_session
 from app.models import Task, TaskStatus, User
 from app.schemas.task import TaskCreate, TaskRead, TaskStatusUpdate, TaskUpdate
+from app.schemas.user import UserCreate, UserRead
 
 router = APIRouter()
 
@@ -17,14 +18,26 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
+@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db_session)) -> User:
+    user = User(email=str(payload.email), name=payload.name)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
 @router.post("/tasks", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
 async def create_task(
     payload: TaskCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
 ) -> Task:
+    user = await db.get(User, payload.user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
     task = Task(
-        user_id=current_user.id,
+        user_id=payload.user_id,
         title=payload.title,
         description=payload.description,
         priority=payload.priority,
@@ -40,7 +53,7 @@ async def create_task(
 @router.get("/tasks", response_model=list[TaskRead])
 async def list_tasks(
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    user_id: UUID | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
     due_before: datetime | None = Query(default=None),
     due_after: datetime | None = Query(default=None),
@@ -49,10 +62,13 @@ async def list_tasks(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> list[Task]:
-    stmt = select(Task).where(Task.user_id == current_user.id)
+    stmt = select(Task)
+
+    if user_id:
+        stmt = stmt.where(Task.user_id == user_id)
 
     if status_filter:
-        stmt = stmt.where(Task.status == status_filter)
+        stmt = stmt.where(Task.status == status_filter.strip().upper())
     if due_before:
         stmt = stmt.where(Task.due_at.is_not(None)).where(Task.due_at <= due_before)
     if due_after:
@@ -84,10 +100,9 @@ async def list_tasks(
 async def get_task(
     task_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
 ) -> Task:
     task = await db.get(Task, task_id)
-    if task is None or task.user_id != current_user.id:
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
@@ -97,10 +112,9 @@ async def update_task(
     task_id: UUID,
     payload: TaskUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
 ) -> Task:
     task = await db.get(Task, task_id)
-    if task is None or task.user_id != current_user.id:
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
     data = payload.model_dump(exclude_unset=True)
@@ -117,14 +131,13 @@ async def update_task_status(
     task_id: UUID,
     payload: TaskStatusUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
 ) -> Task:
     task = await db.get(Task, task_id)
-    if task is None or task.user_id != current_user.id:
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    task.status = payload.status.value
-    if payload.status in (TaskStatus.done, TaskStatus.cancelled):
+    task.status = payload.status
+    if payload.status in (TaskStatus.done.value, TaskStatus.cancelled.value):
         task.completed_at = datetime.now(timezone.utc)
     else:
         task.completed_at = None
@@ -138,10 +151,9 @@ async def update_task_status(
 async def delete_task(
     task_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
 ) -> None:
     task = await db.get(Task, task_id)
-    if task is None or task.user_id != current_user.id:
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
     await db.delete(task)

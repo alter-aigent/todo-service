@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,7 @@ async def get_db_session() -> AsyncSession:
 
 
 async def get_current_user(
-    session: AsyncSession,
+    session: AsyncSession = Depends(get_db_session),
     x_user_id: str | None = Header(default=None),
 ) -> User:
     """Very small auth shim.

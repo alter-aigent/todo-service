@@ -1,20 +1,21 @@
 from datetime import datetime
-from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import Timestamped
 
 
-class TaskStatus(StrEnum):
-    pending = "PENDING"
-    in_progress = "IN_PROGRESS"
-    done = "DONE"
-    cancelled = "CANCELLED"
+def _normalize_status(v: str) -> str:
+    v_norm = v.strip().upper()
+    allowed = {"PENDING", "IN_PROGRESS", "DONE", "CANCELLED"}
+    if v_norm not in allowed:
+        raise ValueError(f"Invalid status: {v!r}")
+    return v_norm
 
 
 class TaskCreate(BaseModel):
+    user_id: UUID
     title: str = Field(min_length=1, max_length=500)
     description: str | None = None
     priority: int | None = Field(default=None, ge=0, le=10)
@@ -26,10 +27,23 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     priority: int | None = Field(default=None, ge=0, le=10)
     due_at: datetime | None = None
+    status: str | None = None
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _normalize_status(v)
 
 
 class TaskStatusUpdate(BaseModel):
-    status: TaskStatus
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: str) -> str:
+        return _normalize_status(v)
 
 
 class TaskRead(Timestamped):
