@@ -36,7 +36,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("title", sa.String(length=500), nullable=False),
+        sa.Column("title", sa.String(length=200), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=False, server_default="PENDING"),
         sa.Column("priority", sa.Integer(), nullable=True),
