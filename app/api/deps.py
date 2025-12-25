@@ -38,7 +38,6 @@ async def get_current_user(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
         return user
 
-    # Create an anonymous user
     anon = User(email=f"anon-{uuid.uuid4()}@example.com", name="Anonymous")
     session.add(anon)
     await session.commit()
